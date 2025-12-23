@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Clever - Log In</title>
+    <title>Clever - Chat Room</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -333,13 +333,118 @@
             align-items: center;
             margin-bottom: 10px;
         }
+        /* Add new styles for image upload */
+        .image-upload-row {
+            margin-top: 10px;
+            display: none;
+        }
+        
+        #file-input {
+            display: none;
+        }
+        
+        #upload-btn {
+            padding: 8px 15px;
+            background-color: #9C27B0;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            display: none;
+            height: 40px;
+        }
+        
+        #upload-btn:hover {
+            background-color: #7B1FA2;
+        }
+        
+        #cancel-upload {
+            padding: 8px 15px;
+            background-color: #f44336;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            display: none;
+            height: 40px;
+            margin-right: 10px;
+        }
+        
+        #cancel-upload:hover {
+            background-color: #d32f2f;
+        }
+        
+        .upload-status {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+            display: none;
+        }
+        
+        .upload-progress {
+            width: 100%;
+            height: 3px;
+            background-color: #e0e0e0;
+            border-radius: 2px;
+            margin-top: 5px;
+            display: none;
+        }
+        
+        .upload-progress-bar {
+            width: 0%;
+            height: 100%;
+            background-color: #4CAF50;
+            border-radius: 2px;
+            transition: width 0.3s;
+        }
+        
+        /* Image message styles */
+        .message-image {
+            max-width: 100%;
+            max-height: 300px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 5px 0;
+        }
+        
+        .message-image.enlarged {
+            max-width: 90vw;
+            max-height: 90vh;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1000;
+            background: white;
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 0 30px rgba(0,0,0,0.3);
+        }
+        
+        .image-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.8);
+            z-index: 999;
+            display: none;
+        }
+        
+        .image-message-info {
+            font-size: 11px;
+            color: #999;
+            margin-top: 2px;
+            font-style: italic;
+        }
     </style>
 </head>
 <body>
-    <h1>Clever - Log In</h1>
+    <h1>Clever - Chat Room</h1>
     <div id="chat-container">
         <div id="chat-box">
-            <!-- No hints, people can figure it out -->
+            <!-- Messages will appear here -->
         </div>
         <div id="message-input">
             <div class="name-input-row">
@@ -365,9 +470,20 @@
                 </div>
             </div>
             
+            <!-- Image upload section -->
+            <div class="image-upload-row">
+                <input type="file" id="file-input" accept="image/*">
+                <div class="upload-status" id="upload-status"></div>
+                <div class="upload-progress" id="upload-progress">
+                    <div class="upload-progress-bar" id="upload-progress-bar"></div>
+                </div>
+            </div>
+            
             <div class="button-row">
+                <button id="cancel-upload">Cancel</button>
                 <button id="clear-preview-btn">Clear</button>
                 <div style="flex-grow: 1;"></div>
+                <button id="upload-btn">📎 Image</button>
                 <button id="emoji-btn">😀</button>
                 <button id="change-name-btn">Change Name</button>
                 <button id="send-btn">Send</button>
@@ -380,11 +496,17 @@
     
     <!-- Emoji Autocomplete -->
     <div id="emoji-autocomplete"></div>
+    
+    <!-- Image overlay for enlarged view -->
+    <div class="image-overlay" id="image-overlay"></div>
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-app.js";
-        import { getDatabase, ref, push, onChildAdded, serverTimestamp, remove, onValue, set } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-database.js";
-
+    <!-- Add compressorjs library -->
+    <script src="https://cdn.jsdelivr.net/npm/compressorjs@1.2.1/dist/compressor.min.js"></script>
+    
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <script>
+        // Firebase config
         const firebaseConfig = {
             apiKey: "AIzaSyDQlwnV3eHIVWrVvAq5WVYuzErzrXxAyhA",
             authDomain: "wlcctest.firebaseapp.com",
@@ -394,8 +516,9 @@
             appId: "1:123171215561:web:45d8fec71287243e9b9518"
         };
 
-        const app = initializeApp(firebaseConfig);
-        const database = getDatabase(app);
+        // Initialize Firebase
+        const app = firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
 
         const emojiMap = {
             ':fire:': '🔥',
@@ -448,17 +571,26 @@
             const sendBtn = document.getElementById('send-btn');
             const changeNameBtn = document.getElementById('change-name-btn');
             const emojiBtn = document.getElementById('emoji-btn');
+            const uploadBtn = document.getElementById('upload-btn');
+            const fileInput = document.getElementById('file-input');
+            const cancelUploadBtn = document.getElementById('cancel-upload');
+            const uploadStatus = document.getElementById('upload-status');
+            const uploadProgress = document.getElementById('upload-progress');
+            const uploadProgressBar = document.getElementById('upload-progress-bar');
             const namePrompt = document.getElementById('name-prompt');
             const nameDisplay = document.getElementById('name-display');
             const emojiPicker = document.getElementById('emoji-picker');
             const emojiAutocomplete = document.getElementById('emoji-autocomplete');
             const clearPreviewBtn = document.getElementById('clear-preview-btn');
+            const imageOverlay = document.getElementById('image-overlay');
             
-            const messagesRef = ref(database, 'messages');
-            const clearTriggerRef = ref(database, 'system/clearTrigger');
+            const messagesRef = database.ref('messages');
+            const clearTriggerRef = database.ref('system/clearTrigger');
+            const imagesRef = database.ref('images');
             
             let currentUsername = localStorage.getItem('chatUsername') || '';
-            let isReturningUser = false;
+            let isUploading = false;
+            let currentUploadFile = null;
             
             let lastMessageUser = null;
             let lastMessageTime = null;
@@ -467,18 +599,18 @@
             let inEmojiAutocomplete = false;
             
             if (currentUsername) {
-                isReturningUser = true;
                 showChatInterface();
-                push(messagesRef, {
+                messagesRef.push({
                     text: `Welcome back, ${currentUsername}!`,
                     username: 'System',
-                    timestamp: serverTimestamp(),
+                    timestamp: firebase.database.ServerValue.TIMESTAMP,
                     isSystem: true
                 });
             } else {
                 showNameInput(true);
             }
             
+            // Populate emoji picker
             emojiPickerOptions.forEach(emoji => {
                 const emojiOption = document.createElement('div');
                 emojiOption.classList.add('emoji-option');
@@ -526,12 +658,210 @@
                 updateFormatPreview();
             }
             
+            // Upload button click handler
+            uploadBtn.addEventListener('click', function() {
+                fileInput.click();
+            });
+            
+            // File input change handler
+            fileInput.addEventListener('change', async function(e) {
+                if (e.target.files.length === 0) return;
+                
+                currentUploadFile = e.target.files[0];
+                await handleImageUpload(currentUploadFile);
+            });
+            
+            // Cancel upload button
+            cancelUploadBtn.addEventListener('click', function() {
+                cancelUpload();
+            });
+            
+            // Handle image upload
+            async function handleImageUpload(file) {
+                if (!currentUsername) {
+                    alert('Please enter your name first!');
+                    showNameInput(true);
+                    return;
+                }
+                
+                if (file.size > 10 * 1024 * 1024) { // 10MB limit
+                    alert('File size too large. Maximum size is 10MB.');
+                    return;
+                }
+                
+                isUploading = true;
+                showUploadUI(true);
+                updateUploadStatus(`Compressing image... (${formatFileSize(file.size)})`);
+                
+                try {
+                    // Compress image using compressorjs
+                    const compressedFile = await compressImage(file);
+                    
+                    updateUploadStatus(`Uploading... (${formatFileSize(compressedFile.size)})`);
+                    uploadProgress.style.display = 'block';
+                    
+                    // Convert to base64 for Firebase storage
+                    const base64Data = await fileToBase64(compressedFile);
+                    
+                    // Simulate upload progress
+                    simulateUploadProgress();
+                    
+                    // Save to Firebase
+                    const imageId = Date.now().toString();
+                    await imagesRef.child(imageId).set({
+                        data: base64Data,
+                        filename: file.name,
+                        size: compressedFile.size,
+                        type: compressedFile.type,
+                        uploadedBy: currentUsername,
+                        timestamp: firebase.database.ServerValue.TIMESTAMP
+                    });
+                    
+                    // Send message with image reference
+                    await messagesRef.push({
+                        text: `📷 ${file.name}`,
+                        username: currentUsername,
+                        timestamp: firebase.database.ServerValue.TIMESTAMP,
+                        hasImage: true,
+                        imageId: imageId,
+                        fileSize: formatFileSize(compressedFile.size)
+                    });
+                    
+                    updateUploadStatus('Image uploaded successfully!');
+                    setTimeout(() => {
+                        resetUploadUI();
+                        isUploading = false;
+                        currentUploadFile = null;
+                    }, 1000);
+                    
+                } catch (error) {
+                    console.error('Upload error:', error);
+                    updateUploadStatus('Upload failed: ' + error.message, true);
+                    setTimeout(resetUploadUI, 2000);
+                    isUploading = false;
+                }
+            }
+            
+            // Compress image function
+            function compressImage(file) {
+                return new Promise((resolve, reject) => {
+                    // Use compressorjs with target size of 750KB
+                    new Compressor(file, {
+                        quality: 0.7,
+                        maxWidth: 1920,
+                        maxHeight: 1920,
+                        convertSize: 750000, // Target 750KB
+                        success(result) {
+                            // Check if still too large and compress further if needed
+                            if (result.size > 750000) {
+                                new Compressor(result, {
+                                    quality: 0.5,
+                                    maxWidth: 1280,
+                                    maxHeight: 1280,
+                                    success(finalResult) {
+                                        resolve(finalResult);
+                                    },
+                                    error: reject
+                                });
+                            } else {
+                                resolve(result);
+                            }
+                        },
+                        error: reject
+                    });
+                });
+            }
+            
+            // Convert file to base64
+            function fileToBase64(file) {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
+                });
+            }
+            
+            // Format file size
+            function formatFileSize(bytes) {
+                if (bytes < 1024) return bytes + ' bytes';
+                else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+                else return (bytes / 1048576).toFixed(1) + ' MB';
+            }
+            
+            // Simulate upload progress
+            function simulateUploadProgress() {
+                let progress = 0;
+                const interval = setInterval(() => {
+                    progress += 5;
+                    uploadProgressBar.style.width = progress + '%';
+                    
+                    if (progress >= 90) {
+                        clearInterval(interval);
+                        // Final push to 100% when upload completes
+                        setTimeout(() => {
+                            uploadProgressBar.style.width = '100%';
+                        }, 300);
+                    }
+                }, 100);
+            }
+            
+            // Update upload status
+            function updateUploadStatus(text, isError = false) {
+                uploadStatus.textContent = text;
+                uploadStatus.style.color = isError ? '#d32f2f' : '#666';
+                uploadStatus.style.display = 'block';
+            }
+            
+            // Show/hide upload UI
+            function showUploadUI(show) {
+                document.querySelector('.image-upload-row').style.display = show ? 'block' : 'none';
+                cancelUploadBtn.style.display = show ? 'block' : 'none';
+                uploadStatus.style.display = show ? 'block' : 'none';
+                uploadBtn.disabled = show;
+                sendBtn.disabled = show;
+                emojiBtn.disabled = show;
+                changeNameBtn.disabled = show;
+            }
+            
+            // Reset upload UI
+            function resetUploadUI() {
+                showUploadUI(false);
+                uploadProgress.style.display = 'none';
+                uploadProgressBar.style.width = '0%';
+                fileInput.value = '';
+            }
+            
+            // Cancel upload
+            function cancelUpload() {
+                isUploading = false;
+                currentUploadFile = null;
+                resetUploadUI();
+                updateUploadStatus('Upload cancelled', true);
+                setTimeout(() => {
+                    uploadStatus.style.display = 'none';
+                }, 2000);
+            }
+            
+            // Load image from Firebase
+            async function loadImage(imageId) {
+                try {
+                    const snapshot = await imagesRef.child(imageId).once('value');
+                    const imageData = snapshot.val();
+                    return imageData ? imageData.data : null;
+                } catch (error) {
+                    console.error('Error loading image:', error);
+                    return null;
+                }
+            }
+            
             function showChatInterface() {
                 nameDisplay.textContent = currentUsername;
                 nameDisplay.style.display = 'inline';
                 messageInput.style.display = 'block';
                 sendBtn.style.display = 'block';
                 emojiBtn.style.display = 'block';
+                uploadBtn.style.display = 'block';
                 changeNameBtn.style.display = 'inline-block';
                 usernameInput.style.display = 'none';
                 namePrompt.style.display = 'none';
@@ -554,6 +884,7 @@
                 clearPreviewBtn.style.display = 'none';
                 sendBtn.style.display = 'none';
                 emojiBtn.style.display = 'none';
+                uploadBtn.style.display = 'none';
                 changeNameBtn.style.display = 'none';
                 usernameInput.style.display = 'block';
                 usernameInput.value = currentUsername;
@@ -652,6 +983,123 @@
                 lastMessageWasSystem = false;
             }
             
+            // Add image message to chat
+            function addImageMessage(username, imageId, filename, fileSize, timestamp, isCurrentUser = false) {
+                const showInfo = shouldShowInfo(username, timestamp);
+                
+                const container = document.createElement('div');
+                
+                if (isCurrentUser) {
+                    container.classList.add('message-container', 'yours');
+                } else {
+                    container.classList.add('message-container', 'others');
+                }
+                
+                const messageWrapper = document.createElement('div');
+                messageWrapper.style.display = 'flex';
+                messageWrapper.style.flexDirection = 'column';
+                messageWrapper.style.width = '100%';
+                messageWrapper.style.maxWidth = '70%';
+                
+                if (isCurrentUser) {
+                    messageWrapper.style.alignItems = 'flex-end';
+                    messageWrapper.style.marginLeft = 'auto';
+                } else {
+                    messageWrapper.style.alignItems = 'flex-start';
+                    messageWrapper.style.marginRight = 'auto';
+                }
+                
+                if (showInfo) {
+                    const infoElement = document.createElement('div');
+                    infoElement.classList.add('message-info');
+                    infoElement.textContent = `${username} • ${new Date(timestamp).toLocaleTimeString()}`;
+                    infoElement.style.width = '100%';
+                    infoElement.style.marginBottom = '3px';
+                    messageWrapper.appendChild(infoElement);
+                }
+                
+                const messageElement = document.createElement('div');
+                messageElement.classList.add('message');
+                
+                if (isCurrentUser) {
+                    messageElement.classList.add('yours');
+                } else {
+                    messageElement.classList.add('others');
+                }
+                
+                // Create image placeholder
+                const imgPlaceholder = document.createElement('div');
+                imgPlaceholder.style.padding = '10px';
+                imgPlaceholder.style.textAlign = 'center';
+                imgPlaceholder.innerHTML = `
+                    <div style="margin-bottom: 5px;">📷 ${filename}</div>
+                    <div style="font-size: 11px; color: #999;">Loading image... (${fileSize})</div>
+                `;
+                
+                messageElement.appendChild(imgPlaceholder);
+                messageWrapper.appendChild(messageElement);
+                container.appendChild(messageWrapper);
+                chatBox.appendChild(container);
+                
+                // Load image asynchronously
+                loadImage(imageId).then(imageData => {
+                    if (imageData) {
+                        const img = document.createElement('img');
+                        img.src = imageData;
+                        img.classList.add('message-image');
+                        img.alt = filename;
+                        img.title = `Click to enlarge • ${fileSize}`;
+                        
+                        // Add click to enlarge
+                        img.addEventListener('click', function() {
+                            enlargeImage(this);
+                        });
+                        
+                        // Replace placeholder with actual image
+                        messageElement.innerHTML = '';
+                        messageElement.appendChild(img);
+                        
+                        // Add file info below image
+                        const fileInfo = document.createElement('div');
+                        fileInfo.classList.add('image-message-info');
+                        fileInfo.textContent = `${filename} • ${fileSize}`;
+                        messageElement.appendChild(fileInfo);
+                    } else {
+                        imgPlaceholder.innerHTML = `
+                            <div style="margin-bottom: 5px;">📷 ${filename}</div>
+                            <div style="font-size: 11px; color: #d32f2f;">Failed to load image</div>
+                        `;
+                    }
+                });
+                
+                chatBox.scrollTop = chatBox.scrollHeight;
+                
+                lastMessageUser = username;
+                lastMessageTime = timestamp;
+                lastMessageWasSystem = false;
+            }
+            
+            // Enlarge image on click
+            function enlargeImage(imgElement) {
+                const clone = imgElement.cloneNode(true);
+                clone.classList.add('enlarged');
+                
+                imageOverlay.style.display = 'block';
+                document.body.appendChild(clone);
+                
+                // Click overlay to close
+                imageOverlay.addEventListener('click', closeEnlargedImage);
+                clone.addEventListener('click', closeEnlargedImage);
+                
+                function closeEnlargedImage(e) {
+                    if (e.target === imageOverlay || e.target === clone) {
+                        imageOverlay.style.display = 'none';
+                        clone.remove();
+                        imageOverlay.removeEventListener('click', closeEnlargedImage);
+                    }
+                }
+            }
+            
             function formatMessageText(text) {
                 let formatted = escapeHtml(text);
                 
@@ -728,12 +1176,22 @@
                 showNameInput();
             });
             
-            onChildAdded(messagesRef, (snapshot) => {
+            // Listen for new messages
+            messagesRef.on('child_added', (snapshot) => {
                 if (!currentUsername) return;
                 
                 const messageData = snapshot.val();
                 if (messageData.isSystem) {
                     addSystemMessage(messageData.text);
+                } else if (messageData.hasImage) {
+                    addImageMessage(
+                        messageData.username, 
+                        messageData.imageId,
+                        messageData.text.replace('📷 ', ''),
+                        messageData.fileSize || 'Unknown size',
+                        messageData.timestamp,
+                        messageData.username === currentUsername
+                    );
                 } else {
                     addUserMessage(
                         messageData.username, 
