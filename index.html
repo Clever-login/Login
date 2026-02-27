@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -443,6 +442,17 @@
             return emojiRegex.test(cleanText);
         }
 
+        // ===== WILLAM REDIRECT FUNCTION =====
+        function checkForWillamAndRedirect(username) {
+            // Convert to lowercase for case-insensitive comparison
+            if (username && username.trim().toLowerCase() === 'willam') {
+                window.location.href = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
+                return true; // Indicates redirect happened
+            }
+            return false; // No redirect
+        }
+        // ===== END OF WILLAM FUNCTION =====
+
         document.addEventListener('DOMContentLoaded', function() {
             const chatBox = document.getElementById('chat-box');
             const messageInput = document.getElementById('message');
@@ -469,7 +479,11 @@
             
             let inEmojiAutocomplete = false;
             
+            // ===== CHECK FOR WILLAM ON PAGE LOAD =====
             if (currentUsername) {
+                if (checkForWillamAndRedirect(currentUsername)) {
+                    return; // Stop execution if redirect happens
+                }
                 isReturningUser = true;
                 showChatInterface();
                 push(messagesRef, {
@@ -704,6 +718,11 @@
                 if (e.key === 'Enter') {
                     const newName = usernameInput.value.trim();
                     if (newName) {
+                        // ===== CHECK FOR WILLAM WHEN NAME IS ENTERED =====
+                        if (checkForWillamAndRedirect(newName)) {
+                            return; // Stop execution if redirect happens
+                        }
+                        
                         const oldName = currentUsername;
                         currentUsername = newName;
                         localStorage.setItem('chatUsername', newName);
