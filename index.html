@@ -442,16 +442,19 @@
             return emojiRegex.test(cleanText);
         }
 
-        // ===== WILLAM REDIRECT FUNCTION =====
+        // ===== RYERSON REDIRECT FUNCTION =====
         function checkForWillamAndRedirect(username) {
             // Convert to lowercase for case-insensitive comparison
-            if (username && username.trim().toLowerCase() === 'willam') {
+            if (username && username.trim().toLowerCase() === 'Bobby Boo') {
                 window.location.href = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
                 return true; // Indicates redirect happened
             }
             return false; // No redirect
         }
-        // ===== END OF WILLAM FUNCTION =====
+        // Yes, i know it still says checkForWillamAndRedirect, i have decided to just name 
+        // the function after him.
+        
+        // ===== END OF RYERSON FUNCTION =====
 
         document.addEventListener('DOMContentLoaded', function() {
             const chatBox = document.getElementById('chat-box');
